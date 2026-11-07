@@ -5,6 +5,7 @@ import { Route, Routes, useLocation } from 'react-router';
 import { FeatureErrorFallback } from '#components/FeatureErrorFallback';
 import { useFeatureFlag } from '#hooks/useFeatureFlag';
 
+import { GermanEtfTax } from './etftax/GermanEtfTax';
 import { AgeOfMoney } from './reports/AgeOfMoney';
 import { BalanceForecast } from './reports/BalanceForecast';
 import { BudgetAnalysis } from './reports/BudgetAnalysis';
@@ -37,6 +38,7 @@ export function ReportRouter() {
   const budgetAnalysisReportEnabled = useFeatureFlag('budgetAnalysisReport');
   const sankeyReportEnabled = useFeatureFlag('sankeyReport');
   const monteCarloReportEnabled = useFeatureFlag('monteCarloReport');
+  const germanEtfTaxReportEnabled = useFeatureFlag('germanEtfTaxReport');
 
   return (
     <Routes>
@@ -241,6 +243,26 @@ export function ReportRouter() {
             element={
               <ReportBoundary>
                 <MonteCarlo />
+              </ReportBoundary>
+            }
+          />
+        </>
+      )}
+      {germanEtfTaxReportEnabled && (
+        <>
+          <Route
+            path="/german-etf-tax"
+            element={
+              <ReportBoundary>
+                <GermanEtfTax />
+              </ReportBoundary>
+            }
+          />
+          <Route
+            path="/german-etf-tax/:id"
+            element={
+              <ReportBoundary>
+                <GermanEtfTax />
               </ReportBoundary>
             }
           />

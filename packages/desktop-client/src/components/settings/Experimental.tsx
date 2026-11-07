@@ -273,6 +273,9 @@ export function ExperimentalFeatures() {
       >
         <Trans>Monte Carlo Analysis Report</Trans>
       </FeatureToggle>
+      <FeatureToggle flag="germanEtfTaxReport">
+        <Trans>German ETF tax widget</Trans>
+      </FeatureToggle>
       {isUsingServer && (
         <FeatureToggle
           flag="enableBanking"

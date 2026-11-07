@@ -53,6 +53,7 @@ import { NON_DRAGGABLE_AREA_CLASS_NAME } from './constants';
 import { DashboardHeader } from './DashboardHeader';
 import './overview.scss';
 import { DashboardSelector } from './DashboardSelector';
+import { EtfTaxCard } from './etftax/EtfTaxCard';
 import { LoadingIndicator } from './LoadingIndicator';
 import { AgeOfMoneyCard } from './reports/AgeOfMoneyCard';
 import { BalanceForecastCard } from './reports/BalanceForecastCard';
@@ -123,6 +124,7 @@ export function Overview({ dashboard }: OverviewProps) {
     useReports();
 
   const sankeyFeatureFlag = useFeatureFlag('sankeyReport');
+  const etfTaxFeatureFlag = useFeatureFlag('germanEtfTaxReport');
 
   const customReportMap = useMemo(
     () => new Map(customReports.map(report => [report.id, report])),
@@ -654,6 +656,14 @@ export function Overview({ dashboard }: OverviewProps) {
                                   },
                                 ]
                               : []),
+                            ...(etfTaxFeatureFlag
+                              ? [
+                                  {
+                                    name: 'etf-tax-card' as const,
+                                    text: t('German ETF tax card'),
+                                  },
+                                ]
+                              : []),
                             {
                               name: 'custom-report' as const,
                               text: t('New custom report'),
@@ -919,6 +929,16 @@ export function Overview({ dashboard }: OverviewProps) {
                         ) : widget.type === 'sankey-card' &&
                           sankeyFeatureFlag ? (
                           <SankeyCard
+                            widgetId={item.i}
+                            isEditing={isEditing}
+                            meta={widget.meta}
+                            onMetaChange={newMeta =>
+                              onMetaChange(item, newMeta)
+                            }
+                          />
+                        ) : widget.type === 'etf-tax-card' &&
+                          etfTaxFeatureFlag ? (
+                          <EtfTaxCard
                             widgetId={item.i}
                             isEditing={isEditing}
                             meta={widget.meta}

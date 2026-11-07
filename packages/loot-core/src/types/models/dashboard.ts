@@ -378,7 +378,8 @@ type SpecializedWidget =
   | FormulaWidget
   | SankeyWidget
   | AgeOfMoneyWidget
-  | BalanceForecastWidget;
+  | BalanceForecastWidget
+  | EtfTaxWidget;
 export type DashboardWidgetEntity = SpecializedWidget | CustomReportWidget;
 export type NewDashboardWidgetEntity = Omit<
   DashboardWidgetEntity,
@@ -459,6 +460,32 @@ export type FormulaWidget = AbstractWidget<
         timeFrame?: TimeFrame;
       }
     >;
+  } | null
+>;
+
+export type EtfTaxWidget = AbstractWidget<
+  'etf-tax-card',
+  {
+    name?: string;
+    /** Depot account ids; FIFO runs separately per depot. */
+    accounts?: string[];
+    /** Remaining Freibetrag; only valid in freibetragYear, afterwards the full allowance applies. */
+    freibetrag?: number;
+    freibetragYear?: number;
+    prices?: Record<string, number>;
+    /** Per tax year: price per ISIN on the first trading day, for the expected Vorabpauschale. */
+    startPricesByYear?: Record<string, Record<string, number>>;
+    /** Per tax year: user-entered Basiszins over the built-in table. */
+    basiszinsByYear?: Record<string, number>;
+    /** Personal capital gains tax rate incl. Soli (and church tax), e.g. 0.26375. */
+    taxRate?: number;
+    /** Regex for depot trade notes; the default when unset. */
+    tradePattern?: string;
+    /**
+     * Booked Vorabpauschale (total per fund, as on the bank statement):
+     * depot id → tax year → ISIN → amount. An entered 0 counts as booked.
+     */
+    vapBooked?: Record<string, Record<string, Record<string, number>>>;
   } | null
 >;
 

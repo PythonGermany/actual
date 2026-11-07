@@ -16,9 +16,12 @@ import { PrivacyFilter } from '#components/PrivacyFilter';
 import { MonteCarloHelpTooltip } from '#components/reports/reports/monte-carlo/MonteCarloHelpTooltip';
 import { GROUP_HEADING_STYLE } from '#components/reports/reports/monte-carlo/monteCarloStyles';
 
+import type { NotePatterns } from './etftax';
 import type { EtfTaxPosition } from './etftax-positions';
+import type { EtfTaxSellConfig } from './etftax-sell';
 import { EtfTaxLookupLink } from './EtfTaxLookupLink';
 import { EtfTaxLotsTable } from './EtfTaxLotsTable';
+import { EtfTaxSellForm } from './EtfTaxSellForm';
 import { formatShares } from './etftaxStyles';
 
 type EtfTaxPositionsTableProps = {
@@ -34,6 +37,14 @@ type EtfTaxPositionsTableProps = {
   priceLookupUrl?: string;
   /** The tax year whose Vorabpauschale is projected. */
   taxYear: number;
+  sell: EtfTaxSellConfig;
+  patterns: NotePatterns;
+  accountName: (id: string) => string;
+  /** Called after a sale was booked with the remaining Freibetrag, to reload the positions. */
+  onSold: (freibetrag: number) => void;
+  /** Remaining Freibetrag and tax rate, for the expected tax of a sale. */
+  freibetrag: number;
+  taxRate: number;
 };
 
 const NUMBER_CELL = { width: 110, textAlign: 'right' } as const;
@@ -50,9 +61,17 @@ export function EtfTaxPositionsTable({
   onStartPriceChange,
   priceLookupUrl: priceLookupTemplate,
   taxYear,
+  sell,
+  patterns,
+  accountName,
+  onSold,
+  freibetrag,
+  taxRate,
 }: EtfTaxPositionsTableProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  // The position whose sell form is open; one at a time.
+  const [selling, setSelling] = useState<string | null>(null);
 
   const toggle = (key: string) =>
     setExpanded(prev => {
@@ -66,7 +85,7 @@ export function EtfTaxPositionsTable({
   return (
     // Scrolls sideways on narrow screens instead of squeezing the columns.
     <View style={{ overflowX: 'auto' }}>
-      <View style={{ minWidth: 1280 }}>
+      <View style={{ minWidth: 1350 }}>
         <View
           style={{
             flexDirection: 'row',
@@ -121,6 +140,7 @@ export function EtfTaxPositionsTable({
           <Text style={{ ...GROUP_HEADING_STYLE, ...NUMBER_CELL, width: 150 }}>
             {t('VAP Jan {{year}}', { year: taxYear + 1 })}
           </Text>
+          <View style={{ width: 60 }} />
         </View>
 
         {positions.map(position => {
@@ -312,6 +332,15 @@ export function EtfTaxPositionsTable({
                     </PrivacyFilter>
                   )}
                 </View>
+                <View style={{ width: 60, alignItems: 'flex-end' }}>
+                  <Button
+                    variant="bare"
+                    aria-label={t('Sell {{isin}}', { isin: position.isin })}
+                    onPress={() => setSelling(selling === key ? null : key)}
+                  >
+                    <Trans>Sell</Trans>
+                  </Button>
+                </View>
               </View>
               {isExpanded && (
                 <EtfTaxLotsTable
@@ -319,6 +348,20 @@ export function EtfTaxPositionsTable({
                   price={position.price}
                   projection={position.projection}
                   money={money}
+                />
+              )}
+              {selling === key && (
+                <EtfTaxSellForm
+                  position={position}
+                  fundName={name}
+                  sell={sell}
+                  patterns={patterns}
+                  accountName={accountName}
+                  money={money}
+                  freibetrag={freibetrag}
+                  taxRate={taxRate}
+                  onClose={() => setSelling(null)}
+                  onSold={onSold}
                 />
               )}
             </View>

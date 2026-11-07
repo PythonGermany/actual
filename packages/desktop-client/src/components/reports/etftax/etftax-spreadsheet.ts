@@ -48,6 +48,11 @@ export function createEtfTaxSpreadsheet({
   vapBooked: Record<string, BookedVap>;
   /** Saved start prices of all years, for the estimates of booked years. */
   startPricesByYear: Record<string, Record<string, number>>;
+  /**
+   * Not read: the query runs once per data function, so passing a new value
+   * (e.g. after booking a sale) makes the caller create a new one.
+   */
+  reloadKey?: number;
 }) {
   return async (
     _spreadsheet: ReturnType<typeof useSpreadsheet>,

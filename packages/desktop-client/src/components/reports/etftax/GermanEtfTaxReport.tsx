@@ -27,9 +27,16 @@ import { addNotification } from '#notifications/notificationsSlice';
 import { useDispatch } from '#redux';
 import { useUpdateDashboardWidgetMutation } from '#reports/mutations';
 
-import { DEFAULT_TAX_RATE, parseNum, yearOf } from './etftax';
+import {
+  compileNotePatterns,
+  DEFAULT_NOTE_PATTERNS,
+  DEFAULT_TAX_RATE,
+  parseNum,
+  yearOf,
+} from './etftax';
 import { summarizePositions } from './etftax-positions';
 import type { EtfTaxData } from './etftax-positions';
+import type { EtfTaxSellConfig } from './etftax-sell';
 import { createEtfTaxSpreadsheet } from './etftax-spreadsheet';
 import type { EtfTaxConfig } from './etftax-spreadsheet';
 import {
@@ -99,6 +106,11 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
   const [vapBooked, setVapBooked] = useState<VapBooked>(
     () => widget?.meta?.vapBooked ?? {},
   );
+  const [sell, setSell] = useState<EtfTaxSellConfig>(
+    () => widget?.meta?.sell ?? {},
+  );
+  // Bumped after a sale is booked so the transactions are queried again.
+  const [reloadKey, setReloadKey] = useState(0);
 
   // The saved overrides of all years, with the one being edited for this year.
   const basiszinsOverrides = useMemo(() => {
@@ -118,6 +130,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
       ...rest
     } = config;
     return createEtfTaxSpreadsheet({
+      reloadKey,
       ...rest,
       prices,
       startPrices,
@@ -132,6 +145,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
     vapBooked,
     widget?.meta,
     basiszinsOverrides,
+    reloadKey,
   ]);
   const freshData = useReport<EtfTaxData>('etf_tax', getData);
   // useReport resets to null on every input change. Keep showing the last
@@ -160,6 +174,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
             tradePattern: config.tradePattern,
             priceLookupUrl: config.priceLookupUrl,
             vapBooked,
+            sell,
             prices,
             ...writeYearlySettings(widget.meta, taxYear, {
               freibetrag: config.freibetrag,
@@ -184,6 +199,28 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
     );
   }
 
+  // A booked sale is permanent, so the Freibetrag it used is saved right away
+  // (only that field; other unsaved edits still wait for "Save widget").
+  const onSold = (freibetrag: number) => {
+    setReloadKey(key => key + 1);
+    if (freibetrag === config.freibetrag) {
+      return;
+    }
+    setConfig(prev => ({ ...prev, freibetrag }));
+    if (widget) {
+      updateWidget({
+        widget: {
+          id: widget.id,
+          meta: {
+            ...(widget.meta ?? {}),
+            freibetrag,
+            freibetragYear: taxYear,
+          },
+        },
+      });
+    }
+  };
+
   const title = widget?.meta?.name || t('German ETF Tax');
   const onSaveWidgetName = (newName: string) => {
     // The editable title only renders when a widget exists
@@ -202,6 +239,12 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
   const accountName = (id: string) =>
     allAccounts.find(a => a.id === id)?.name ?? id;
   const usesDefaultPatterns = !config.tradePattern;
+  // The positions only render once the pattern compiled, so the fallback is never used.
+  const compiledPatterns = compileNotePatterns({ trade: config.tradePattern });
+  const tradePatterns =
+    'patterns' in compiledPatterns
+      ? compiledPatterns.patterns
+      : DEFAULT_NOTE_PATTERNS;
 
   // Prices per ISIN; an empty or invalid input removes the entry.
   const updatePrice =
@@ -324,6 +367,8 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
               onConfigChange={patch =>
                 setConfig(prev => ({ ...prev, ...patch }))
               }
+              sell={sell}
+              onSellChange={patch => setSell(prev => ({ ...prev, ...patch }))}
             />
           </View>
 
@@ -413,6 +458,12 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
                     onStartPriceChange={onStartPriceChange}
                     priceLookupUrl={config.priceLookupUrl}
                     taxYear={data.vapYear.taxYear}
+                    sell={sell}
+                    patterns={tradePatterns}
+                    accountName={accountName}
+                    onSold={onSold}
+                    freibetrag={config.freibetrag}
+                    taxRate={config.taxRate}
                   />
                 )}
               </View>

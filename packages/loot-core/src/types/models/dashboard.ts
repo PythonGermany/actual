@@ -483,6 +483,22 @@ export type EtfTaxWidget = AbstractWidget<
     tradePattern?: string;
     /** Quote page URL with an {isin} placeholder; no link when unset. */
     priceLookupUrl?: string;
+    /** Payout account and the category, payee and note of each split part of a sale. */
+    sell?: {
+      payoutAccount?: string;
+      investedCategory?: string;
+      gainCategory?: string;
+      gainPayee?: string;
+      gainNote?: string;
+      taxCategory?: string;
+      taxPayee?: string;
+      taxNote?: string;
+      feeCategory?: string;
+      feePayee?: string;
+      feeNote?: string;
+      /** Fee prefilled for every sale, e.g. a flat order fee. */
+      defaultFee?: number;
+    };
     /**
      * Booked Vorabpauschale (total per fund, as on the bank statement):
      * depot id → tax year → ISIN → amount. An entered 0 counts as booked.

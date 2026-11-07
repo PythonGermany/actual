@@ -23,6 +23,13 @@ import {
 import type { Group, Lot, TxnRow } from './etftax';
 import { computeEtfTax, summarizePositions } from './etftax-positions';
 import {
+  buildSaleTransactions,
+  expectedSaleTax,
+  freibetragAfterSale,
+  planSale,
+  saleNote,
+} from './etftax-sell';
+import {
   basiszinsOverridesOf,
   readYearlySettings,
   writeYearlySettings,
@@ -595,5 +602,187 @@ describe('tax', () => {
     }
     // An unknown year falls back to the latest rate, flagged.
     expect(basiszinsFor(2028)).toEqual({ rate: 0.032, known: false });
+  });
+});
+
+describe('selling', () => {
+  const lots = [
+    { qtyRem: 10, price: 125 },
+    { qtyRem: 5, price: 130 },
+  ];
+
+  it('values the sold shares at their FIFO cost basis', () => {
+    // 10 × 125 + 2 × 130 = 1,510 invested; sold for 1,800.
+    expect(
+      planSale({ lots, qty: 12, saleValue: 1800, fee: 5.9, tax: 14.1 }),
+    ).toEqual({
+      plan: {
+        investedCents: 151000,
+        gainCents: 29000,
+        feeCents: 590,
+        taxCents: 1410,
+        payoutCents: 178000,
+      },
+    });
+    // A sale below cost gives a negative gain.
+    const loss = planSale({ lots, qty: 2, saleValue: 200 });
+    expect('plan' in loss && loss.plan.gainCents).toBe(-5000);
+  });
+
+  it('rejects impossible sales', () => {
+    expect(planSale({ lots, qty: 0, saleValue: 1 })).toEqual({
+      error: 'no-shares',
+    });
+    expect(planSale({ lots, qty: 16, saleValue: 1 })).toEqual({
+      error: 'too-many-shares',
+    });
+    expect(planSale({ lots, qty: 1, saleValue: 0 })).toEqual({
+      error: 'no-sale-value',
+    });
+    expect(planSale({ lots, qty: 1, saleValue: 1, fee: -1 })).toEqual({
+      error: 'negative-cost',
+    });
+  });
+
+  it('expects tax only above the remaining Freibetrag', () => {
+    const vapLots = lots.map(l => ({ ...l, vap: 1 }));
+    // Basis 10 × 126 + 2 × 131 = 1,522; (1,800 − 8 − 1,522) × 0.7 = 189 taxable.
+    const sale = (freibetrag: number) =>
+      expectedSaleTax({
+        lots: vapLots,
+        qty: 12,
+        saleValue: 1800,
+        fee: 8,
+        freibetrag,
+        taxRate: 0.25,
+        teilfreistellung: 0.3,
+      });
+    // Within the Freibetrag all 189 are tax-free: 189 × 0.25 = 47.25 saved.
+    expect(sale(1000)).toMatchObject({
+      aboveFreibetrag: 0,
+      tax: 0,
+      taxSaved: 47.25,
+    });
+    expect(sale(1000).taxableGain).toBeCloseTo(189, 9);
+    // Only 89 fall within the Freibetrag: 89 × 0.25 = 22.25 saved.
+    expect(sale(89)).toMatchObject({ tax: 25, taxSaved: 22.25 });
+    expect(sale(89).aboveFreibetrag).toBeCloseTo(100, 9);
+    // A loss is never taxed.
+    expect(
+      expectedSaleTax({
+        lots: vapLots,
+        qty: 2,
+        saleValue: 100,
+        freibetrag: 0,
+        taxRate: 0.25,
+        teilfreistellung: 0.3,
+      }).tax,
+    ).toBe(0);
+  });
+
+  it('uses up the Freibetrag with the taxable gain only', () => {
+    expect(freibetragAfterSale(1000, 189)).toBe(811);
+    expect(freibetragAfterSale(100, 189)).toBe(0);
+    // A loss goes to the loss pot and leaves the Freibetrag as it is.
+    expect(freibetragAfterSale(1000, -50)).toBe(1000);
+  });
+
+  it('writes a note the trade pattern reads back', () => {
+    for (const qty of [12, 2.5, 0.1234]) {
+      const groups = DEFAULT_NOTE_PATTERNS.trade.exec(
+        saleNote(qty, 'IE00EXAMPLE1'),
+      )?.groups;
+      expect(groups?.isin).toBe('IE00EXAMPLE1');
+      expect(parseNum(groups?.qty ?? '')).toBe(qty);
+    }
+  });
+
+  it('builds a split whose transfer part pays the depot', () => {
+    const result = planSale({ lots, qty: 12, saleValue: 1800, fee: 5.9 });
+    if (!('plan' in result)) {
+      throw new Error(result.error);
+    }
+    const [parent, ...children] = buildSaleTransactions({
+      plan: result.plan,
+      isin: 'IE00EXAMPLE1',
+      qty: 12,
+      date: '2026-11-06',
+      payoutAccount: 'cash',
+      depotPayee: 'depot-payee',
+      sell: {
+        investedCategory: 'etf',
+        feeCategory: 'fees',
+        feePayee: 'broker',
+        gainCategory: 'gains',
+      },
+    });
+    expect(parent).toMatchObject({
+      is_parent: true,
+      account: 'cash',
+      amount: 179410,
+      payee: 'broker',
+    });
+    // Invested value, capital gain, then fee; no tax part without tax.
+    expect(children.map(c => [c.amount, c.payee, c.category])).toEqual([
+      [151000, 'depot-payee', 'etf'],
+      [29000, null, 'gains'],
+      [-590, 'broker', 'fees'],
+    ]);
+    // Split parts are listed by descending sort order.
+    const orders = children.map(c => c.sort_order ?? 0);
+    expect([...orders].sort((a, b) => b - a)).toEqual(orders);
+    expect(new Set(orders).size).toBe(orders.length);
+    // Only the transfer part carries the note.
+    expect([parent, ...children].map(c => c.notes)).toEqual([
+      undefined,
+      '12x #IE00EXAMPLE1',
+      undefined,
+      undefined,
+    ]);
+    expect(children.reduce((sum, c) => sum + c.amount, 0)).toBe(parent.amount);
+    for (const c of children) {
+      expect(c).toMatchObject({
+        is_child: true,
+        parent_id: parent.id,
+        account: 'cash',
+        date: '2026-11-06',
+      });
+    }
+  });
+
+  it('puts the tax between the capital gain and the fee', () => {
+    const result = planSale({
+      lots,
+      qty: 12,
+      saleValue: 1800,
+      fee: 5.9,
+      tax: 14.1,
+    });
+    if (!('plan' in result)) {
+      throw new Error(result.error);
+    }
+    const [, ...children] = buildSaleTransactions({
+      plan: result.plan,
+      isin: 'IE00EXAMPLE1',
+      qty: 12,
+      date: '2026-11-06',
+      payoutAccount: 'cash',
+      depotPayee: 'depot-payee',
+      sell: {
+        taxCategory: 'taxes',
+        taxPayee: 'tax-office',
+        taxNote: 'Abgeltungsteuer',
+        feeCategory: 'fees',
+        feeNote: 'Order fee',
+        gainPayee: 'broker',
+        gainNote: 'Kursgewinn',
+      },
+    });
+    expect(children.map(c => [c.amount, c.payee, c.notes])).toEqual([
+      [151000, 'depot-payee', '12x #IE00EXAMPLE1'],
+      [29000, 'broker', 'Kursgewinn'],
+      [-1410, 'tax-office', 'Abgeltungsteuer'],
+      [-590, null, 'Order fee'],
+    ]);
   });
 });

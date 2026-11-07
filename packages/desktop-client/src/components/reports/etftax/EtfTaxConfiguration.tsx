@@ -26,10 +26,12 @@ import {
   DEFAULT_TRADE_PATTERN,
   KNOWN_BASISZINS,
 } from './etftax';
+import type { EtfTaxSellConfig } from './etftax-sell';
 import type { EtfTaxConfig } from './etftax-spreadsheet';
 import { EtfTaxPriceConfiguration } from './EtfTaxPriceConfiguration';
+import { EtfTaxSellConfiguration } from './EtfTaxSellConfiguration';
 
-type ConfigurationTab = 'depots' | 'patterns' | 'lookup';
+type ConfigurationTab = 'depots' | 'patterns' | 'selling' | 'lookup';
 
 const PATTERN_FIELD_STYLE = { width: 520, maxWidth: '100%' } as const;
 
@@ -41,6 +43,8 @@ type EtfTaxConfigurationProps = {
   /** Show the depot checklist here; on wide screens it lives in the sidebar instead. */
   showAccounts: boolean;
   onConfigChange: (patch: Partial<EtfTaxConfig>) => void;
+  sell: EtfTaxSellConfig;
+  onSellChange: (patch: Partial<EtfTaxSellConfig>) => void;
 };
 
 export function EtfTaxConfiguration({
@@ -49,6 +53,8 @@ export function EtfTaxConfiguration({
   taxYear,
   showAccounts,
   onConfigChange,
+  sell,
+  onSellChange,
 }: EtfTaxConfigurationProps) {
   const { t } = useTranslation();
   const builtInBasiszins: number | undefined = KNOWN_BASISZINS[taxYear];
@@ -107,6 +113,12 @@ export function EtfTaxConfiguration({
           <Trans>Note pattern</Trans>
         </ModeButton>
         <ModeButton
+          selected={activeTab === 'selling'}
+          onSelect={() => setActiveTab('selling')}
+        >
+          <Trans>Selling</Trans>
+        </ModeButton>
+        <ModeButton
           selected={activeTab === 'lookup'}
           onSelect={() => setActiveTab('lookup')}
         >
@@ -131,14 +143,23 @@ export function EtfTaxConfiguration({
           <Trans>
             How depot trades are recognised in your transaction notes.
           </Trans>
-        ) : (
+        ) : activeTab === 'lookup' ? (
           <Trans>
             Where to look up prices: a quote page to open from each fund.
+          </Trans>
+        ) : (
+          <Trans>
+            Where a sale made with the Sell button of a position is booked. It
+            creates a split in the payout account: a transfer from the depot
+            over the invested value (the FIFO cost basis), the fee, the tax
+            withheld and the capital gain.
           </Trans>
         )}
       </Text>
 
-      {activeTab === 'lookup' ? (
+      {activeTab === 'selling' ? (
+        <EtfTaxSellConfiguration sell={sell} onSellChange={onSellChange} />
+      ) : activeTab === 'lookup' ? (
         <EtfTaxPriceConfiguration
           priceLookupUrl={config.priceLookupUrl}
           onChange={onConfigChange}

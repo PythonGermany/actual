@@ -481,6 +481,8 @@ export type EtfTaxWidget = AbstractWidget<
     taxRate?: number;
     /** Regex for depot trade notes; the default when unset. */
     tradePattern?: string;
+    /** Quote page URL with an {isin} placeholder; no link when unset. */
+    priceLookupUrl?: string;
     /**
      * Booked Vorabpauschale (total per fund, as on the bank statement):
      * depot id → tax year → ISIN → amount. An entered 0 counts as booked.

@@ -25,6 +25,8 @@ export type EtfTaxConfig = {
   /** User-entered Basiszins for the current tax year; null uses the built-in table. */
   basiszinsOverride: number | null;
   tradePattern?: string;
+  /** Quote page URL with an {isin} placeholder; not used by the computation. */
+  priceLookupUrl?: string;
 };
 
 export function createEtfTaxSpreadsheet({

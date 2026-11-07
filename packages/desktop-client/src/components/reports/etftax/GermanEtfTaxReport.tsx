@@ -87,6 +87,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
       taxRate: widget?.meta?.taxRate ?? DEFAULT_TAX_RATE,
       basiszinsOverride: yearly.basiszinsOverride,
       tradePattern: widget?.meta?.tradePattern,
+      priceLookupUrl: widget?.meta?.priceLookupUrl,
     };
   });
   const [prices, setPrices] = useState<Record<string, number>>(
@@ -111,7 +112,11 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
   }, [config.basiszinsOverride, widget?.meta, taxYear]);
 
   const getData = useMemo(() => {
-    const { basiszinsOverride: _edited, ...rest } = config;
+    const {
+      basiszinsOverride: _edited,
+      priceLookupUrl: _lookup,
+      ...rest
+    } = config;
     return createEtfTaxSpreadsheet({
       ...rest,
       prices,
@@ -153,6 +158,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
             accounts: config.accounts,
             taxRate: config.taxRate,
             tradePattern: config.tradePattern,
+            priceLookupUrl: config.priceLookupUrl,
             vapBooked,
             prices,
             ...writeYearlySettings(widget.meta, taxYear, {
@@ -405,6 +411,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
                     money={money}
                     onPriceChange={onPriceChange}
                     onStartPriceChange={onStartPriceChange}
+                    priceLookupUrl={config.priceLookupUrl}
                     taxYear={data.vapYear.taxYear}
                   />
                 )}
@@ -435,6 +442,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
                       config.accounts.length > 1 ? accountName(id) : null
                     }
                     money={money}
+                    priceLookupUrl={config.priceLookupUrl}
                     onBookedChange={onBookedChange}
                   />
                 </View>

@@ -95,6 +95,24 @@ export const DEFAULT_NOTE_PATTERNS: NotePatterns = {
 };
 
 /**
+ * A lookup page URL template with {isin} replaced. Null without a template,
+ * so no link is shown.
+ */
+export function isinUrl(isin: string, template?: string): string | null {
+  const source = template?.trim();
+  return source ? source.replaceAll('{isin}', encodeURIComponent(isin)) : null;
+}
+
+/** The site a lookup URL points to, e.g. "example.com"; null for an invalid URL. */
+export function lookupSite(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Booked Vorabpauschale of one depot, as entered from the bank statements:
  * tax year → ISIN → total amount. The Vorabpauschale for tax year Y is booked
  * in January of Y + 1. An entered 0 counts as booked.

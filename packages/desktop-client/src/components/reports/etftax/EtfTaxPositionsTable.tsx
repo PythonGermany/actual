@@ -17,6 +17,7 @@ import { MonteCarloHelpTooltip } from '#components/reports/reports/monte-carlo/M
 import { GROUP_HEADING_STYLE } from '#components/reports/reports/monte-carlo/monteCarloStyles';
 
 import type { EtfTaxPosition } from './etftax-positions';
+import { EtfTaxLookupLink } from './EtfTaxLookupLink';
 import { EtfTaxLotsTable } from './EtfTaxLotsTable';
 import { formatShares } from './etftaxStyles';
 
@@ -29,6 +30,8 @@ type EtfTaxPositionsTableProps = {
   money: (value: number) => string;
   onPriceChange: (isin: string, value: string) => void;
   onStartPriceChange: (isin: string, value: string) => void;
+  /** Quote page URL template for the price lookup links; no link when unset. */
+  priceLookupUrl?: string;
   /** The tax year whose Vorabpauschale is projected. */
   taxYear: number;
 };
@@ -45,6 +48,7 @@ export function EtfTaxPositionsTable({
   money,
   onPriceChange,
   onStartPriceChange,
+  priceLookupUrl: priceLookupTemplate,
   taxYear,
 }: EtfTaxPositionsTableProps) {
   const { t } = useTranslation();
@@ -163,9 +167,21 @@ export function EtfTaxPositionsTable({
                   )}
                 </Button>
                 <View style={{ flex: 1, minWidth: 150 }}>
-                  <Text style={{ fontWeight: 600 }}>
-                    {name ?? position.isin}
-                  </Text>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Text style={{ fontWeight: 600 }}>
+                      {name ?? position.isin}
+                    </Text>
+                    <EtfTaxLookupLink
+                      isin={position.isin}
+                      template={priceLookupTemplate}
+                    />
+                  </View>
                   {subtitle && (
                     <Text
                       style={{ color: theme.pageTextSubdued, fontSize: 12 }}

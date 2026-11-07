@@ -27,8 +27,9 @@ import {
   KNOWN_BASISZINS,
 } from './etftax';
 import type { EtfTaxConfig } from './etftax-spreadsheet';
+import { EtfTaxPriceConfiguration } from './EtfTaxPriceConfiguration';
 
-type ConfigurationTab = 'depots' | 'patterns';
+type ConfigurationTab = 'depots' | 'patterns' | 'lookup';
 
 const PATTERN_FIELD_STYLE = { width: 520, maxWidth: '100%' } as const;
 
@@ -105,6 +106,12 @@ export function EtfTaxConfiguration({
         >
           <Trans>Note pattern</Trans>
         </ModeButton>
+        <ModeButton
+          selected={activeTab === 'lookup'}
+          onSelect={() => setActiveTab('lookup')}
+        >
+          <Trans>Remote lookup</Trans>
+        </ModeButton>
       </View>
 
       <Text style={{ color: theme.pageText }}>
@@ -120,14 +127,23 @@ export function EtfTaxConfiguration({
               the Basiszins.
             </Trans>
           )
-        ) : (
+        ) : activeTab === 'patterns' ? (
           <Trans>
             How depot trades are recognised in your transaction notes.
+          </Trans>
+        ) : (
+          <Trans>
+            Where to look up prices: a quote page to open from each fund.
           </Trans>
         )}
       </Text>
 
-      {activeTab === 'depots' ? (
+      {activeTab === 'lookup' ? (
+        <EtfTaxPriceConfiguration
+          priceLookupUrl={config.priceLookupUrl}
+          onChange={onConfigChange}
+        />
+      ) : activeTab === 'depots' ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 40 }}>
           {showAccounts && (
             <View style={{ gap: 10, width: '100%' }}>

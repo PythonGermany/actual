@@ -8,6 +8,7 @@ import { View } from '@actual-app/components/view';
 import { GROUP_HEADING_STYLE } from '#components/reports/reports/monte-carlo/monteCarloStyles';
 
 import type { EtfTaxPosition } from './etftax-positions';
+import { EtfTaxLookupLink } from './EtfTaxLookupLink';
 
 type EtfTaxBookedVapTableProps = {
   positions: EtfTaxPosition[];
@@ -16,6 +17,8 @@ type EtfTaxBookedVapTableProps = {
   /** Fund name from the ISIN tag's description, if any. */
   fundName: (isin: string) => string | null;
   money: (value: number) => string;
+  /** Quote page URL template for the lookup links; no links when unset. */
+  priceLookupUrl?: string;
   onBookedChange: (
     depotId: string,
     taxYear: number,
@@ -32,6 +35,7 @@ export function EtfTaxBookedVapTable({
   depotName,
   fundName,
   money,
+  priceLookupUrl,
   onBookedChange,
 }: EtfTaxBookedVapTableProps) {
   const { t } = useTranslation();
@@ -83,7 +87,17 @@ export function EtfTaxBookedVapTable({
               }}
             >
               <View style={{ flex: 1, minWidth: 200 }}>
-                <Text style={{ fontWeight: 600 }}>{name ?? position.isin}</Text>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                >
+                  <Text style={{ fontWeight: 600 }}>
+                    {name ?? position.isin}
+                  </Text>
+                  <EtfTaxLookupLink
+                    isin={position.isin}
+                    template={priceLookupUrl}
+                  />
+                </View>
                 {subtitle && (
                   <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
                     {subtitle}

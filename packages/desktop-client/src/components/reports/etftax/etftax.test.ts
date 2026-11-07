@@ -7,6 +7,8 @@ import {
   DEFAULT_NOTE_PATTERNS,
   DEFAULT_TAX_RATE,
   hasActualVap,
+  isinUrl,
+  lookupSite,
   maxTaxFreeQty,
   missingVap,
   parseNum,
@@ -472,6 +474,25 @@ describe('note patterns', () => {
     expect(
       buildState(sampleRows(), 'Depot', compiled.patterns).groups.size,
     ).toBe(0);
+  });
+});
+
+describe('isinUrl', () => {
+  it('gives no url without a template', () => {
+    expect(isinUrl('IE00EXAMPLE1')).toBeNull();
+    expect(isinUrl('IE00EXAMPLE1', '  ')).toBeNull();
+  });
+
+  it('replaces every {isin} in a custom template, URL-encoded', () => {
+    expect(
+      isinUrl('DE00 EXAMPLE2', 'https://quotes.example/{isin}?q={isin}'),
+    ).toBe('https://quotes.example/DE00%20EXAMPLE2?q=DE00%20EXAMPLE2');
+  });
+
+  it('names the linked site without www', () => {
+    expect(lookupSite('https://www.quotes.example/x')).toBe('quotes.example');
+    expect(lookupSite('https://quotes.example/x')).toBe('quotes.example');
+    expect(lookupSite('not a url {isin}')).toBeNull();
   });
 });
 

@@ -23,6 +23,8 @@ import { EtfTaxLookupLink } from './EtfTaxLookupLink';
 import { EtfTaxLotsTable } from './EtfTaxLotsTable';
 import { EtfTaxSellForm } from './EtfTaxSellForm';
 import { formatShares } from './etftaxStyles';
+import { remotePriceInput } from './useLivePrices';
+import type { LivePrices } from './useLivePrices';
 
 type EtfTaxPositionsTableProps = {
   positions: EtfTaxPosition[];
@@ -35,6 +37,12 @@ type EtfTaxPositionsTableProps = {
   onStartPriceChange: (isin: string, value: string) => void;
   /** Quote page URL template for the price lookup links; no link when unset. */
   priceLookupUrl?: string;
+  /** Prices the user typed in; the positions' prices also include live ones. */
+  typedPrices: Record<string, number>;
+  live: LivePrices;
+  /** Start prices the user typed in, and the fetched ones. */
+  typedStartPrices: Record<string, number>;
+  liveStart: LivePrices;
   /** The tax year whose Vorabpauschale is projected. */
   taxYear: number;
   sell: EtfTaxSellConfig;
@@ -60,6 +68,10 @@ export function EtfTaxPositionsTable({
   onPriceChange,
   onStartPriceChange,
   priceLookupUrl: priceLookupTemplate,
+  typedPrices,
+  live,
+  typedStartPrices,
+  liveStart,
   taxYear,
   sell,
   patterns,
@@ -153,6 +165,17 @@ export function EtfTaxPositionsTable({
           const subtitle = [name ? position.isin : null, depot]
             .filter(Boolean)
             .join(' · ');
+          // A typed price wins; otherwise the live one is used and shown
+          // as the placeholder.
+          const typed = typedPrices[position.isin];
+          const priceInput = remotePriceInput(typed, live, position.isin, t);
+          const typedStart = typedStartPrices[position.isin];
+          const startInput = remotePriceInput(
+            typedStart,
+            liveStart,
+            position.isin,
+            t,
+          );
           const proceeds =
             position.max && position.price !== null
               ? position.max.qty * position.price
@@ -233,17 +256,21 @@ export function EtfTaxPositionsTable({
                 </Text>
                 <View style={{ width: 100 }}>
                   <Input
-                    key={position.price ?? 'none'}
-                    defaultValue={
-                      position.price === null ? '' : String(position.price)
-                    }
-                    placeholder={t('Price')}
+                    key={typed ?? 'none'}
+                    defaultValue={typed === undefined ? '' : String(typed)}
+                    placeholder={priceInput.placeholder ?? t('Price')}
+                    title={priceInput.title}
                     aria-label={t('Current price of {{isin}}', {
                       isin: position.isin,
                     })}
                     onUpdate={value => onPriceChange(position.isin, value)}
                     onEnter={value => onPriceChange(position.isin, value)}
-                    style={{ textAlign: 'right' }}
+                    style={{
+                      textAlign: 'right',
+                      ...(priceInput.warn && {
+                        borderColor: theme.warningText,
+                      }),
+                    }}
                   />
                 </View>
                 <Text style={{ ...NUMBER_CELL, width: 130 }}>
@@ -282,20 +309,24 @@ export function EtfTaxPositionsTable({
                 </Text>
                 <View style={{ width: 100 }}>
                   <Input
-                    key={position.startPrice ?? 'none'}
+                    key={typedStart ?? 'none'}
                     defaultValue={
-                      position.startPrice === null
-                        ? ''
-                        : String(position.startPrice)
+                      typedStart === undefined ? '' : String(typedStart)
                     }
-                    placeholder={t('Price')}
+                    placeholder={startInput.placeholder ?? t('Price')}
+                    title={startInput.title}
                     aria-label={t(
                       'Price of {{isin}} on the first trading day of {{year}}',
                       { isin: position.isin, year: taxYear },
                     )}
                     onUpdate={value => onStartPriceChange(position.isin, value)}
                     onEnter={value => onStartPriceChange(position.isin, value)}
-                    style={{ textAlign: 'right' }}
+                    style={{
+                      textAlign: 'right',
+                      ...(startInput.warn && {
+                        borderColor: theme.warningText,
+                      }),
+                    }}
                   />
                 </View>
                 <View style={{ ...NUMBER_CELL, width: 150 }}>

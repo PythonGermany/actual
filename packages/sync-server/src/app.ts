@@ -13,6 +13,7 @@ import * as adminApp from './app-admin';
 import * as akahuApp from './app-akahu/app-akahu.js';
 import * as corsApp from './app-cors-proxy';
 import * as enableBankingApp from './app-enablebanking/app-enablebanking';
+import * as etfPricesApp from './app-etf-prices';
 import * as goCardlessApp from './app-gocardless/app-gocardless';
 import * as openidApp from './app-openid';
 import * as pluggai from './app-pluggyai/app-pluggyai';
@@ -72,6 +73,8 @@ app.use('/secret', secretApp.handlers);
 if (config.get('corsProxy.enabled')) {
   app.use('/cors-proxy', corsApp.handlers);
 }
+
+app.use('/etf-prices', etfPricesApp.handlers);
 
 app.use('/admin', adminApp.handlers);
 app.use('/openid', openidApp.handlers);

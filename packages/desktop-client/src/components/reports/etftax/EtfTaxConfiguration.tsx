@@ -45,6 +45,8 @@ type EtfTaxConfigurationProps = {
   onConfigChange: (patch: Partial<EtfTaxConfig>) => void;
   sell: EtfTaxSellConfig;
   onSellChange: (patch: Partial<EtfTaxSellConfig>) => void;
+  /** A held ISIN to test the price API with. */
+  sampleIsin?: string;
 };
 
 export function EtfTaxConfiguration({
@@ -55,6 +57,7 @@ export function EtfTaxConfiguration({
   onConfigChange,
   sell,
   onSellChange,
+  sampleIsin,
 }: EtfTaxConfigurationProps) {
   const { t } = useTranslation();
   const builtInBasiszins: number | undefined = KNOWN_BASISZINS[taxYear];
@@ -145,7 +148,8 @@ export function EtfTaxConfiguration({
           </Trans>
         ) : activeTab === 'lookup' ? (
           <Trans>
-            Where to look up prices: a quote page to open from each fund.
+            Where to look up prices: a quote page to open from each fund, and
+            optionally APIs to fetch the current and start prices from.
           </Trans>
         ) : (
           <Trans>
@@ -162,6 +166,9 @@ export function EtfTaxConfiguration({
       ) : activeTab === 'lookup' ? (
         <EtfTaxPriceConfiguration
           priceLookupUrl={config.priceLookupUrl}
+          livePrices={config.livePrices}
+          sampleIsin={sampleIsin}
+          taxYear={taxYear}
           onChange={onConfigChange}
         />
       ) : activeTab === 'depots' ? (

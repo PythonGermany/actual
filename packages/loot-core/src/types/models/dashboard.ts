@@ -483,6 +483,18 @@ export type EtfTaxWidget = AbstractWidget<
     tradePattern?: string;
     /** Quote page URL with an {isin} placeholder; no link when unset. */
     priceLookupUrl?: string;
+    /** Prices fetched from a JSON API through the sync server; typed prices win. */
+    livePrices?: {
+      enabled?: boolean;
+      /** API URL with an {isin} placeholder. */
+      url?: string;
+      /** Where the price is in the response, e.g. "latestQuote.raw". */
+      jsonPath?: string;
+      /** Start price API URL with {isin}, {year}, {from} and {to} placeholders. */
+      startUrl?: string;
+      /** Where the start price is in that response, e.g. "series[0].value.raw". */
+      startJsonPath?: string;
+    };
     /** Payout account and the category, payee and note of each split part of a sale. */
     sell?: {
       payoutAccount?: string;

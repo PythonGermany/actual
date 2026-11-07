@@ -9,6 +9,7 @@ import { compileNotePatterns, DEFAULT_NOTE_PATTERNS } from './etftax';
 import type { BookedVap, NotePatterns, TxnRow } from './etftax';
 import { computeEtfTax } from './etftax-positions';
 import type { EtfTaxData } from './etftax-positions';
+import type { LivePricesConfig } from './useLivePrices';
 
 type QueryRow = {
   date: string;
@@ -27,6 +28,8 @@ export type EtfTaxConfig = {
   tradePattern?: string;
   /** Quote page URL with an {isin} placeholder; not used by the computation. */
   priceLookupUrl?: string;
+  /** Live price fetching; not used by the computation, which gets the fetched prices. */
+  livePrices?: LivePricesConfig;
 };
 
 export function createEtfTaxSpreadsheet({

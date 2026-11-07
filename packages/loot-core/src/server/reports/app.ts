@@ -1,11 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 
+import * as asyncStorage from '#platform/server/asyncStorage';
 import { createApp } from '#server/app';
 import { aqlQuery } from '#server/aql';
 import * as db from '#server/db';
-import { ValidationError } from '#server/errors';
+import { PostError, ValidationError } from '#server/errors';
 import { requiredFields } from '#server/models';
 import { mutator } from '#server/mutators';
+import { post } from '#server/post';
+import { getServer } from '#server/server-config';
 import { undoable } from '#server/undo';
 import { q } from '#shared/query';
 import type { CustomReportData, CustomReportEntity } from '#types/models';
@@ -193,11 +196,47 @@ async function deleteReport(id: CustomReportEntity['id']) {
   await db.delete_('custom_reports', id);
 }
 
+/**
+ * Fetches JSON from a price API through the sync server, for the German ETF
+ * Tax widget's live prices. Price APIs don't allow cross-origin requests, so
+ * the browser can't call them directly.
+ */
+async function fetchEtfPrice({
+  url,
+}: {
+  url: string;
+}): Promise<{ json: unknown } | { error: string }> {
+  const serverConfig = getServer();
+  if (!serverConfig) {
+    return { error: 'no-server' };
+  }
+  const userToken = await asyncStorage.getItem('user-token');
+  if (!userToken) {
+    return { error: 'unauthorized' };
+  }
+  try {
+    const data = await post(
+      serverConfig.ETF_PRICES_SERVER + '/fetch',
+      { url },
+      { 'X-ACTUAL-TOKEN': userToken },
+      15_000,
+    );
+    return { json: data.json };
+  } catch (error) {
+    // A server without the endpoint answers with an HTML page as the reason.
+    const reason = error instanceof PostError ? error.reason : '';
+    return {
+      error: /^[a-z-]{1,40}$/.test(reason) ? reason : 'request-failed',
+    };
+  }
+}
+
 export type ReportsHandlers = {
   'report/get': typeof getReports;
   'report/create': typeof createReport;
   'report/update': typeof updateReport;
   'report/delete': typeof deleteReport;
+  'etf-price-fetch': typeof fetchEtfPrice;
 };
 
 // Expose functions to the client
@@ -207,3 +246,4 @@ app.method('report/get', getReports);
 app.method('report/create', mutator(undoable(createReport)));
 app.method('report/update', mutator(undoable(updateReport)));
 app.method('report/delete', mutator(undoable(deleteReport)));
+app.method('etf-price-fetch', fetchEtfPrice);

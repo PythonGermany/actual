@@ -95,12 +95,66 @@ export const DEFAULT_NOTE_PATTERNS: NotePatterns = {
 };
 
 /**
- * A lookup page URL template with {isin} replaced. Null without a template,
- * so no link is shown.
+ * A URL template (lookup page or price API) with {isin} replaced. Null
+ * without a template, so nothing is linked or fetched.
  */
-export function isinUrl(isin: string, template?: string): string | null {
+export function isinUrl(
+  isin: string,
+  template?: string,
+  vars: Readonly<Record<string, string>> = {},
+): string | null {
   const source = template?.trim();
-  return source ? source.replaceAll('{isin}', encodeURIComponent(isin)) : null;
+  if (!source) {
+    return null;
+  }
+  return Object.entries({ ...vars, isin }).reduce(
+    (url, [name, value]) =>
+      url.replaceAll(`{${name}}`, encodeURIComponent(value)),
+    source,
+  );
+}
+
+/**
+ * Placeholders of the start price URL: the tax year and a date window over
+ * the first two weeks of January, wide enough to hold its first trading day.
+ */
+export function startPriceVars(year: number): Record<string, string> {
+  return { year: String(year), from: `${year}-01-01`, to: `${year}-01-15` };
+}
+
+/**
+ * Reads a price out of an API response. The path uses dots for fields and
+ * [n] for list items, [-1] being the last one, e.g. "latestQuote.raw" or
+ * "series[-1].value.raw"; a leading "$." is allowed. Numbers and numeric
+ * strings (also with a decimal comma) count; anything else gives null.
+ */
+export function readJsonPath(json: unknown, path: string): number | null {
+  const source = path.trim().replace(/^\$\.?/, '');
+  if (source === '') {
+    return null;
+  }
+  let value: unknown = json;
+  for (const [, key, index] of source.matchAll(/([^.[\]]+)|\[(-?\d+)\]/g)) {
+    if (index !== undefined) {
+      if (!Array.isArray(value)) {
+        return null;
+      }
+      const i = Number(index);
+      value = value[i < 0 ? value.length + i : i];
+    } else if (value !== null && typeof value === 'object') {
+      // Own fields only, so "constructor" and the like read nothing.
+      value = Object.hasOwn(value, key) ? Reflect.get(value, key) : undefined;
+    } else {
+      return null;
+    }
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && /^\s*-?\d+([.,]\d+)?\s*$/.test(value)) {
+    return Number(value.trim().replace(',', '.'));
+  }
+  return null;
 }
 
 /** The site a lookup URL points to, e.g. "example.com"; null for an invalid URL. */

@@ -14,9 +14,11 @@ import {
   parseNum,
   projectVap,
   prorationFactor,
+  readJsonPath,
   settlementDate,
   snapshotLotsAt,
   splitByDepot,
+  startPriceVars,
   taxableGain,
   vapTotal,
 } from './etftax';
@@ -496,10 +498,56 @@ describe('isinUrl', () => {
     ).toBe('https://quotes.example/DE00%20EXAMPLE2?q=DE00%20EXAMPLE2');
   });
 
+  it('fills the start price placeholders', () => {
+    expect(
+      isinUrl(
+        'IE00EXAMPLE1',
+        'https://quotes.example/{isin}/chart?from={from}&to={to}&y={year}',
+        startPriceVars(2026),
+      ),
+    ).toBe(
+      'https://quotes.example/IE00EXAMPLE1/chart?from=2026-01-01&to=2026-01-15&y=2026',
+    );
+  });
+
   it('names the linked site without www', () => {
     expect(lookupSite('https://www.quotes.example/x')).toBe('quotes.example');
     expect(lookupSite('https://quotes.example/x')).toBe('quotes.example');
     expect(lookupSite('not a url {isin}')).toBeNull();
+  });
+});
+
+describe('readJsonPath', () => {
+  const response = {
+    latestQuote: { raw: 127.24, localized: '127,24' },
+    series: [{ value: { raw: 120 } }, { value: { raw: 125.5 } }],
+    name: 'World',
+  };
+
+  it('reads nested fields', () => {
+    expect(readJsonPath(response, 'latestQuote.raw')).toBe(127.24);
+    expect(readJsonPath(response, '$.latestQuote.raw')).toBe(127.24);
+  });
+
+  it('reads list items, negative from the end', () => {
+    expect(readJsonPath(response, 'series[0].value.raw')).toBe(120);
+    expect(readJsonPath(response, 'series[-1].value.raw')).toBe(125.5);
+    expect(readJsonPath([3, 4], '[1]')).toBe(4);
+  });
+
+  it('reads numeric strings, also with a decimal comma', () => {
+    expect(readJsonPath(response, 'latestQuote.localized')).toBe(127.24);
+    expect(readJsonPath({ p: ' 12.5 ' }, 'p')).toBe(12.5);
+  });
+
+  it('gives null for missing or non-numeric values', () => {
+    expect(readJsonPath(response, 'name')).toBeNull();
+    expect(readJsonPath(response, 'latestQuote.missing')).toBeNull();
+    expect(readJsonPath(response, 'name.length')).toBeNull();
+    expect(readJsonPath(response, 'latestQuote[0]')).toBeNull();
+    expect(readJsonPath(response, 'series[5].value.raw')).toBeNull();
+    expect(readJsonPath(response, '')).toBeNull();
+    expect(readJsonPath(response, 'latestQuote')).toBeNull();
   });
 });
 

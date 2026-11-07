@@ -29,6 +29,7 @@ import {
 } from './etftax-yearly';
 import { formatShares } from './etftaxStyles';
 import { useFundNames } from './useFundNames';
+import { useLivePrices, useLiveStartPrices } from './useLivePrices';
 
 const EMPTY_IDS: string[] = [];
 const EMPTY_PRICES: Record<string, number> = {};
@@ -65,22 +66,43 @@ export function EtfTaxCard({
     [meta, taxYear],
   );
 
+  // The last result is kept while reloading: the live prices are fetched
+  // for its ISINs, which must not drop out in between.
+  const [data, setData] = useState<EtfTaxData | null>(null);
+  const heldIsins = [...new Set(data?.positions.map(p => p.isin) ?? [])];
+  const live = useLivePrices(heldIsins, meta?.livePrices);
+  const liveStart = useLiveStartPrices(heldIsins, meta?.livePrices, taxYear);
+
   const params = useMemo(
     () =>
       createEtfTaxSpreadsheet({
         accounts: accountIds,
         freibetrag,
         taxRate,
-        prices,
-        startPrices,
+        // A typed price overrides the live one.
+        prices: { ...live.prices, ...prices },
+        startPrices: { ...liveStart.prices, ...startPrices },
         basiszinsOverrides: basiszinsOverridesOf(meta),
         tradePattern,
         vapBooked: meta?.vapBooked ?? {},
         startPricesByYear: startPricesByYearOf(meta),
       }),
-    [accountIds, freibetrag, taxRate, prices, startPrices, meta, tradePattern],
+    [
+      accountIds,
+      freibetrag,
+      taxRate,
+      prices,
+      live.prices,
+      startPrices,
+      liveStart.prices,
+      meta,
+      tradePattern,
+    ],
   );
-  const data = useReport<EtfTaxData>('etf_tax', params);
+  const freshData = useReport<EtfTaxData>('etf_tax', params);
+  if (freshData !== null && freshData !== data) {
+    setData(freshData);
+  }
 
   const money = (value: number) => format(amountToInteger(value), 'financial');
   const warningCount = data ? data.missing.length + data.warnings.length : 0;

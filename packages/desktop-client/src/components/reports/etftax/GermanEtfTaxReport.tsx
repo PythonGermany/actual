@@ -53,6 +53,7 @@ import { EtfTaxPositionsTable } from './EtfTaxPositionsTable';
 import { EtfTaxStats } from './EtfTaxStats';
 import { EtfTaxWarnings } from './EtfTaxWarnings';
 import { useFundNames } from './useFundNames';
+import { useLivePrices, useLiveStartPrices } from './useLivePrices';
 
 const EMPTY_ACCOUNTS: AccountEntity[] = [];
 
@@ -95,6 +96,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
       basiszinsOverride: yearly.basiszinsOverride,
       tradePattern: widget?.meta?.tradePattern,
       priceLookupUrl: widget?.meta?.priceLookupUrl,
+      livePrices: widget?.meta?.livePrices,
     };
   });
   const [prices, setPrices] = useState<Record<string, number>>(
@@ -123,17 +125,27 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
     return overrides;
   }, [config.basiszinsOverride, widget?.meta, taxYear]);
 
+  // useReport resets to null on every input change. Keep showing the last
+  // result meanwhile, so the table doesn't unmount (collapsing expanded lots
+  // and jumping the scroll position) each time a price is edited.
+  const [data, setData] = useState<EtfTaxData | null>(null);
+  const heldIsins = [...new Set(data?.positions.map(p => p.isin) ?? [])];
+  const live = useLivePrices(heldIsins, config.livePrices);
+  const liveStart = useLiveStartPrices(heldIsins, config.livePrices, taxYear);
+
   const getData = useMemo(() => {
     const {
       basiszinsOverride: _edited,
       priceLookupUrl: _lookup,
+      livePrices: _live,
       ...rest
     } = config;
     return createEtfTaxSpreadsheet({
       reloadKey,
       ...rest,
-      prices,
-      startPrices,
+      // A typed price overrides the live one.
+      prices: { ...live.prices, ...prices },
+      startPrices: { ...liveStart.prices, ...startPrices },
       basiszinsOverrides,
       vapBooked,
       startPricesByYear: startPricesByYearOf(widget?.meta ?? null),
@@ -141,17 +153,15 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
   }, [
     config,
     prices,
+    live.prices,
     startPrices,
+    liveStart.prices,
     vapBooked,
     widget?.meta,
     basiszinsOverrides,
     reloadKey,
   ]);
   const freshData = useReport<EtfTaxData>('etf_tax', getData);
-  // useReport resets to null on every input change. Keep showing the last
-  // result meanwhile, so the table doesn't unmount (collapsing expanded lots
-  // and jumping the scroll position) each time a price is edited.
-  const [data, setData] = useState<EtfTaxData | null>(null);
   if (freshData !== null && freshData !== data) {
     setData(freshData);
   }
@@ -173,6 +183,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
             taxRate: config.taxRate,
             tradePattern: config.tradePattern,
             priceLookupUrl: config.priceLookupUrl,
+            livePrices: config.livePrices,
             vapBooked,
             sell,
             prices,
@@ -369,6 +380,7 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
               }
               sell={sell}
               onSellChange={patch => setSell(prev => ({ ...prev, ...patch }))}
+              sampleIsin={data?.positions[0]?.isin}
             />
           </View>
 
@@ -457,6 +469,10 @@ export function GermanEtfTaxReport({ widget }: GermanEtfTaxReportProps) {
                     onPriceChange={onPriceChange}
                     onStartPriceChange={onStartPriceChange}
                     priceLookupUrl={config.priceLookupUrl}
+                    typedPrices={prices}
+                    live={live}
+                    typedStartPrices={startPrices}
+                    liveStart={liveStart}
                     taxYear={data.vapYear.taxYear}
                     sell={sell}
                     patterns={tradePatterns}

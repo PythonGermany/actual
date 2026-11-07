@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
+import { useResponsive } from '@actual-app/components/hooks/useResponsive';
 import { Input } from '@actual-app/components/input';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
@@ -67,6 +68,7 @@ export function EtfTaxSellForm({
   onSold,
 }: EtfTaxSellFormProps) {
   const { t } = useTranslation();
+  const { isNarrowWidth } = useResponsive();
   const dispatch = useDispatch();
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
   const { data: payees = [] } = usePayees();
@@ -231,7 +233,7 @@ export function EtfTaxSellForm({
   return (
     <View
       style={{
-        marginLeft: 20,
+        marginLeft: isNarrowWidth ? 4 : 20,
         marginBottom: 10,
         padding: '4px 0 4px 14px',
         borderLeft: `2px solid ${theme.tableBorder}`,

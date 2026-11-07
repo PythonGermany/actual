@@ -1,5 +1,6 @@
 import { Trans, useTranslation } from 'react-i18next';
 
+import { useResponsive } from '@actual-app/components/hooks/useResponsive';
 import { Input } from '@actual-app/components/input';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
@@ -7,7 +8,7 @@ import { View } from '@actual-app/components/view';
 
 import { GROUP_HEADING_STYLE } from '#components/reports/reports/monte-carlo/monteCarloStyles';
 
-import type { EtfTaxPosition } from './etftax-positions';
+import type { EtfTaxPosition, EtfTaxVapYear } from './etftax-positions';
 import { EtfTaxLookupLink } from './EtfTaxLookupLink';
 
 type EtfTaxBookedVapTableProps = {
@@ -28,8 +29,13 @@ type EtfTaxBookedVapTableProps = {
 };
 
 const CELL_WIDTH = 120;
+// Width of an input in the narrow layout.
+const NARROW_INPUT_WIDTH = 130;
 
-/** One input per fund and settled tax year for the Vorabpauschale the bank booked. */
+/**
+ * One input per fund and settled tax year for the Vorabpauschale the bank
+ * booked: a grid on wide screens, a block per fund on narrow ones.
+ */
 export function EtfTaxBookedVapTable({
   positions,
   depotName,
@@ -39,9 +45,102 @@ export function EtfTaxBookedVapTable({
   onBookedChange,
 }: EtfTaxBookedVapTableProps) {
   const { t } = useTranslation();
+  const { isNarrowWidth } = useResponsive();
   const years = [
     ...new Set(positions.flatMap(p => p.vapYears.map(y => y.taxYear))),
   ].sort((a, b) => b - a);
+
+  // Fund name with its lookup link, and the subtitle.
+  const fundTitle = (position: EtfTaxPosition) => {
+    const depot = depotName(position.depotId);
+    const name = fundName(position.isin);
+    const subtitle = [name ? position.isin : null, depot]
+      .filter(Boolean)
+      .join(' · ');
+    return (
+      <>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontWeight: 600 }}>{name ?? position.isin}</Text>
+          <EtfTaxLookupLink isin={position.isin} template={priceLookupUrl} />
+        </View>
+        {subtitle && (
+          <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
+            {subtitle}
+          </Text>
+        )}
+      </>
+    );
+  };
+
+  const bookedInput = (position: EtfTaxPosition, entry: EtfTaxVapYear) => (
+    <Input
+      key={entry.booked ?? 'none'}
+      defaultValue={entry.booked === null ? '' : String(entry.booked)}
+      placeholder={entry.estimate === null ? '' : `≤ ${money(entry.estimate)}`}
+      aria-label={t('Vorabpauschale of {{isin}} for tax year {{year}}', {
+        isin: position.isin,
+        year: entry.taxYear,
+      })}
+      onUpdate={value =>
+        onBookedChange(position.depotId, entry.taxYear, position.isin, value)
+      }
+      onEnter={value =>
+        onBookedChange(position.depotId, entry.taxYear, position.isin, value)
+      }
+      style={{
+        textAlign: 'right',
+        ...(entry.booked === null && { borderColor: theme.warningText }),
+      }}
+    />
+  );
+
+  if (isNarrowWidth) {
+    return (
+      <View>
+        {positions
+          .filter(position => position.vapYears.length > 0)
+          .map(position => (
+            <View
+              key={`${position.depotId}/${position.isin}`}
+              style={{
+                padding: '8px 0',
+                borderBottom: `1px solid ${theme.tableBorder}`,
+                gap: 6,
+              }}
+            >
+              <View>{fundTitle(position)}</View>
+              {[...position.vapYears]
+                .sort((a, b) => b.taxYear - a.taxYear)
+                .map(entry => (
+                  <View
+                    key={entry.taxYear}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                    }}
+                  >
+                    <View>
+                      <Text style={GROUP_HEADING_STYLE}>
+                        {String(entry.taxYear)}
+                      </Text>
+                      <Text
+                        style={{ color: theme.pageTextSubdued, fontSize: 11 }}
+                      >
+                        {t('booked Jan {{year}}', { year: entry.taxYear + 1 })}
+                      </Text>
+                    </View>
+                    <View style={{ width: NARROW_INPUT_WIDTH }}>
+                      {bookedInput(position, entry)}
+                    </View>
+                  </View>
+                ))}
+            </View>
+          ))}
+      </View>
+    );
+  }
 
   return (
     // Scrolls sideways when there are many years.
@@ -69,102 +168,44 @@ export function EtfTaxBookedVapTable({
           ))}
         </View>
 
-        {positions.map(position => {
-          const depot = depotName(position.depotId);
-          const name = fundName(position.isin);
-          const subtitle = [name ? position.isin : null, depot]
-            .filter(Boolean)
-            .join(' · ');
-          return (
-            <View
-              key={`${position.depotId}/${position.isin}`}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 10,
-                padding: 8,
-                borderBottom: `1px solid ${theme.tableBorder}`,
-              }}
-            >
-              <View style={{ flex: 1, minWidth: 200 }}>
-                <View
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                >
-                  <Text style={{ fontWeight: 600 }}>
-                    {name ?? position.isin}
-                  </Text>
-                  <EtfTaxLookupLink
-                    isin={position.isin}
-                    template={priceLookupUrl}
-                  />
-                </View>
-                {subtitle && (
-                  <Text style={{ color: theme.pageTextSubdued, fontSize: 12 }}>
-                    {subtitle}
-                  </Text>
-                )}
-              </View>
-              {years.map(year => {
-                const entry = position.vapYears.find(y => y.taxYear === year);
-                if (!entry) {
-                  return (
-                    <Text
-                      key={year}
-                      style={{
-                        width: CELL_WIDTH,
-                        textAlign: 'right',
-                        color: theme.pageTextSubdued,
-                      }}
-                    >
-                      –
-                    </Text>
-                  );
-                }
-                return (
-                  <View key={year} style={{ width: CELL_WIDTH }}>
-                    <Input
-                      key={entry.booked ?? 'none'}
-                      defaultValue={
-                        entry.booked === null ? '' : String(entry.booked)
-                      }
-                      placeholder={
-                        entry.estimate === null
-                          ? ''
-                          : `≤ ${money(entry.estimate)}`
-                      }
-                      aria-label={t(
-                        'Vorabpauschale of {{isin}} for tax year {{year}}',
-                        { isin: position.isin, year },
-                      )}
-                      onUpdate={value =>
-                        onBookedChange(
-                          position.depotId,
-                          year,
-                          position.isin,
-                          value,
-                        )
-                      }
-                      onEnter={value =>
-                        onBookedChange(
-                          position.depotId,
-                          year,
-                          position.isin,
-                          value,
-                        )
-                      }
-                      style={{
-                        textAlign: 'right',
-                        ...(entry.booked === null && {
-                          borderColor: theme.warningText,
-                        }),
-                      }}
-                    />
-                  </View>
-                );
-              })}
+        {positions.map(position => (
+          <View
+            key={`${position.depotId}/${position.isin}`}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              padding: 8,
+              borderBottom: `1px solid ${theme.tableBorder}`,
+            }}
+          >
+            <View style={{ flex: 1, minWidth: 200 }}>
+              {fundTitle(position)}
             </View>
-          );
-        })}
+            {years.map(year => {
+              const entry = position.vapYears.find(y => y.taxYear === year);
+              if (!entry) {
+                return (
+                  <Text
+                    key={year}
+                    style={{
+                      width: CELL_WIDTH,
+                      textAlign: 'right',
+                      color: theme.pageTextSubdued,
+                    }}
+                  >
+                    –
+                  </Text>
+                );
+              }
+              return (
+                <View key={year} style={{ width: CELL_WIDTH }}>
+                  {bookedInput(position, entry)}
+                </View>
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );
